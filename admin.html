@@ -1385,6 +1385,7 @@ mark{background:rgba(201,168,76,.25);color:var(--text);padding:0 1px;border-radi
           <div class="form-row">
             <div class="form-field"><label class="form-label">Location *</label><input class="form-input" id="evLocation" placeholder="City, Country or Virtual"/></div>
             <div class="form-field"><label class="form-label">Organisation / Host</label><input class="form-input" id="evOrg" placeholder="Who is running the event"/></div>
+            <div class="form-field"><label class="form-label">RSVP capacity (blank = unlimited)</label><input class="form-input" id="evCapacity" type="number" min="1" placeholder="e.g. 50"/></div>
           </div>
           <div class="form-row">
             <div class="form-field"><label class="form-label">My Role</label><input class="form-input" id="evRole" placeholder="e.g. Researcher &amp; Presenter"/></div>
@@ -1878,7 +1879,7 @@ mark{background:rgba(201,168,76,.25);color:var(--text);padding:0 1px;border-radi
             <div class="form-field"><label class="form-label">New Password</label><input class="form-input" type="password" id="newPass" placeholder="New password"/></div>
           </div>
           <div class="form-field" style="max-width:360px"><label class="form-label">Confirm New Password</label><input class="form-input" type="password" id="confPass" placeholder="Confirm password"/></div>
-          <p style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin:.5rem 0">Changes are saved to Supabase permanently. The original <code>ericadmin</code> login remains as an emergency fallback.</p>
+          <p style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin:.5rem 0">Changes are saved to Supabase permanently. There is no built-in fallback login; use <code>seed-admin.sql</code> if you are ever locked out.</p>
           <button class="btn-gold" onclick="saveCredentials()">Update Credentials</button>
           <div class="save-status" id="credStatus"></div>
           <p style="font-family:var(--mono);font-size:.56rem;color:var(--muted);margin-top:.75rem;line-height:1.6">Note: Credentials are stored in this file. After updating, download and redeploy both HTML files.</p>
@@ -2082,8 +2083,8 @@ var CYBER_CV_DATA = {
 // ═══════════════════════════════════════════════════
 var SUPABASE_URL = 'YOUR_SUPABASE_URL';
 var SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY';
-var ADMIN_USERNAME  = 'ericadmin';
-var ADMIN_PASSWORD  = 'EWF@2026#Blog';
+var ADMIN_USERNAME  = '';
+var ADMIN_PASSWORD  = null; // no built-in credentials: login is verified in Postgres via verify_admin_login (see seed-admin.sql)
 
 // ── Supabase helper ──────────────────────────────────
 
@@ -2099,7 +2100,14 @@ async function sb(method, path, body) {
     }
   };
   if (body) opts.body = JSON.stringify(body);
-  var res = await fetch(SUPABASE_URL + '/rest/v1/' + path, opts);
+  var res;
+  if (/^(cv_requests|event_rsvps|contact_submissions|newsletter_subscribers)(\?|$)/.test(path) && window._actor) {
+    // PII tables are not accessible to the anon key; go through the authenticated admin proxy
+    res = await fetch('/api/admin-proxy', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({u: window._actor.u, p: window._actor.p, method: method, path: path, body: body, prefer: method==='POST' ? 'return=representation' : ''})});
+  } else {
+    res = await fetch(SUPABASE_URL + '/rest/v1/' + path, opts);
+  }
   if (!res.ok) throw new Error(await res.text());
   var t = await res.text();
   return t ? JSON.parse(t) : [];
@@ -2370,6 +2378,7 @@ function showEventEditor(id) {
     document.getElementById('evDateEnd').value     = ev.date_end || '';
     document.getElementById('evLocation').value    = ev.location;
     document.getElementById('evOrg').value         = ev.organisation || '';
+    document.getElementById('evCapacity').value    = ev.capacity || '';
     document.getElementById('evRole').value        = ev.my_role || '';
     document.getElementById('evStatus').value      = ev.status;
     document.getElementById('evImage').value       = ev.cover_image || '';
@@ -2394,7 +2403,7 @@ function hideEventEditor() {
 }
 
 function clearEventForm() {
-  ['editEventId','evName','evDateStart','evDateEnd','evLocation','evOrg','evRole','evImage','evLink','evShortDesc','evFullDesc'].forEach(function(id){
+  ['editEventId','evName','evDateStart','evDateEnd','evLocation','evOrg','evCapacity','evRole','evImage','evLink','evShortDesc','evFullDesc'].forEach(function(id){
     var el = document.getElementById(id); if (el) el.value = '';
   });
   var t = document.getElementById('evType'); if (t) t.value = '';
@@ -2419,6 +2428,7 @@ async function saveEvent() {
     date_end:         document.getElementById('evDateEnd').value || dateStart,
     location:         location,
     organisation:     document.getElementById('evOrg').value.trim() || null,
+    capacity:         parseInt(document.getElementById('evCapacity').value) || null,
     my_role:          document.getElementById('evRole').value.trim() || null,
     cover_image:      document.getElementById('evImage').value.trim() || null,
     event_link:       document.getElementById('evLink').value.trim() || null,
@@ -2604,7 +2614,8 @@ async function saveCredentials() {
   if (p !== c)  { showStatus('credStatus', 'Passwords do not match.', 'err'); return; }
   if (!curr)    { showStatus('credStatus', 'Enter your current password to confirm.', 'err'); return; }
   // Verify current password
-  var currentOk = (curr === ADMIN_PASSWORD);
+  var currentOk = !!ADMIN_PASSWORD && (curr === ADMIN_PASSWORD);
+  if (!ADMIN_USERNAME && typeof currentSession !== 'undefined' && currentSession) ADMIN_USERNAME = currentSession.username;
   if (!currentOk && typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
     try {
       var rows = await sbRPC('verify_admin_login', {p_username: ADMIN_USERNAME, p_password: curr});
@@ -2616,23 +2627,13 @@ async function saveCredentials() {
   if (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
     try {
       // Check if super admin record exists in DB
-      var existing = await sb('GET', 'admin_users_safe?role=eq.super_admin&select=id,username').catch(function(){return[];});
-      if (existing && existing.length) {
-        var adminId = existing[0].id;
-        // Update username
-        await sb('PATCH', 'admin_users_safe?id=eq.' + adminId, {username: u});
-        // Reset password via secure RPC
-        await sbRPC('admin_reset_password', {p_user_id: adminId, p_new_password: p});
-      } else {
-        // Create super admin record in DB
-        await sbRPC('create_admin_user', {
-          p_username: u, p_password: p,
-          p_display_name: 'Uzoukwu Eric Ikenna',
-          p_email: 'uzoukwuericiyke@yahoo.com',
-          p_role: 'super_admin',
-          p_permissions: ALL_SECTION_IDS.slice()
-        });
-      }
+      var me = (typeof currentSession!=='undefined'&&currentSession)||{};
+      var list = await sbRPC('admin_list_users', actorArgs());
+      var sa = (list||[]).find(function(x){return x.username===me.username;});
+      if (!sa) throw new Error('Sign in as the super admin first.');
+      await sbRPC('admin_update_user', Object.assign({p_user_id: sa.id, p_username: u, p_display_name: null, p_email: sa.email, p_role: null, p_permissions: null, p_status: null}, actorArgs()));
+      await sbRPC('admin_reset_password', Object.assign({p_user_id: sa.id, p_new_password: p}, actorArgs()));
+      window._actor = {u:u,p:p}; if (currentSession) currentSession.username = u;
       // Update in-memory for current session
       ADMIN_USERNAME = u; ADMIN_PASSWORD = p;
       showStatus('credStatus', '\u2713 Credentials updated and saved to database permanently.', 'ok');
@@ -3290,10 +3291,16 @@ function lockSession() {
 
 function unlockSession() {
   var pass = document.getElementById('lockPass').value;
-  if (pass === ADMIN_PASSWORD) {
+  var _unlock = function(){
     document.getElementById('lockScreen').classList.remove('active');
     document.getElementById('lockErr').style.display = 'none';
     resetInactivityTimer();
+  };
+  if (ADMIN_PASSWORD && pass === ADMIN_PASSWORD) { _unlock(); }
+  else if (typeof currentSession !== 'undefined' && currentSession && currentSession.username) {
+    sbRPC('verify_admin_login', {p_username: currentSession.username, p_password: pass}).then(function(rows){
+      if (rows && rows.length) _unlock(); else document.getElementById('lockErr').style.display = 'block';
+    }).catch(function(){ document.getElementById('lockErr').style.display = 'block'; });
   } else {
     document.getElementById('lockErr').style.display = 'block';
     document.getElementById('lockPass').value = '';
@@ -3728,7 +3735,7 @@ function _baseDoLoginOriginal() {
   var user = document.getElementById('authUser').value.trim();
   var pass = document.getElementById('authPass').value;
   var err  = document.getElementById('authError');
-  if (user !== ADMIN_USERNAME || pass !== ADMIN_PASSWORD) {
+  if (!ADMIN_PASSWORD || user !== ADMIN_USERNAME || pass !== ADMIN_PASSWORD) {
     recordFailedLogin();
     err.style.display='block'; document.getElementById('authPass').value=''; return;
   }
@@ -4690,6 +4697,7 @@ function applySessionToUI() {
   });
 }
 
+function actorArgs(){return window._actor?{p_actor_user:window._actor.u,p_actor_pass:window._actor.p}:{};}
 async function sbRPC(fnName, params) {
   var res = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + fnName, {
     method: 'POST',
@@ -4709,7 +4717,7 @@ function doLogin() {
   var pass = document.getElementById('authPass').value;
   var err  = document.getElementById('authError');
 
-  if (user === ADMIN_USERNAME && pass === ADMIN_PASSWORD) {
+  if (ADMIN_PASSWORD && user === ADMIN_USERNAME && pass === ADMIN_PASSWORD) {
     var savedPin = localStorage.getItem('admin_2fa_pin');
     if (savedPin) {
       var pin = prompt('Enter your 2FA PIN:');
@@ -4724,6 +4732,7 @@ function doLogin() {
     sbRPC('verify_admin_login', { p_username: user, p_password: pass }).then(function(rows) {
       if (rows && rows.length) {
         var u = rows[0];
+        window._actor = { u: user, p: pass };
         currentSession = {
           username: u.username, displayName: u.display_name || u.username,
           role: u.role, permissions: u.permissions || [], isSuperAdmin: u.role === 'super_admin'
@@ -4815,8 +4824,8 @@ async function loadAdminUsers() {
   if (!list) return;
   list.innerHTML = '<span style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">Loading...</span>';
   try {
-    allAdminUsers = await sb('GET','admin_users_safe?order=created_at.asc&select=*');
-    var bootstrapRow = '<div class="post-row"><div><div class="post-row-title">' + ADMIN_USERNAME + ' <span class="role-badge role-super_admin">super admin</span></div><div class="post-row-meta">Bootstrap account &middot; always active &middot; set in code</div></div><div class="td-actions"><span style="font-family:var(--mono);font-size:.56rem;color:var(--muted)">Permanent</span></div></div>';
+    allAdminUsers = await sbRPC('admin_list_users', actorArgs());
+    var bootstrapRow = '';
     if (!allAdminUsers.length) {
       list.innerHTML = bootstrapRow + '<div style="padding:1rem 0;font-family:var(--mono);font-size:.62rem;color:var(--muted)">No additional admin users yet.</div>';
       return;
@@ -4894,17 +4903,14 @@ async function saveAdminUser() {
 
   try {
     if (id) {
-      await sb('PATCH','admin_users_safe?id=eq.'+id, {
-        display_name: display, email: email || null, role: _selectedRole,
-        permissions: _selectedPerms, status: status
-      });
-      if (password) await sbRPC('admin_reset_password', { p_user_id: parseInt(id), p_new_password: password });
+      await sbRPC('admin_update_user', Object.assign({p_user_id: parseInt(id), p_username: null, p_display_name: display, p_email: email || null, p_role: _selectedRole, p_permissions: _selectedPerms, p_status: status}, actorArgs()));
+      if (password) await sbRPC('admin_reset_password', Object.assign({ p_user_id: parseInt(id), p_new_password: password }, actorArgs()));
       showStatus('adminUserSaveStatus','\u2713 Admin user updated.','ok');
     } else {
-      await sbRPC('create_admin_user', {
+      await sbRPC('create_admin_user', Object.assign({
         p_username: username, p_password: password, p_display_name: display,
         p_email: email || null, p_role: _selectedRole, p_permissions: _selectedPerms
-      });
+      }, actorArgs()));
       showStatus('adminUserSaveStatus','\u2713 Admin user created.','ok');
     }
     logAction('\u{1F465}', 'Admin user saved', display);
@@ -4921,7 +4927,7 @@ async function quickResetPassword(id, name) {
   var newPass = prompt('New password for ' + name + ':');
   if (!newPass) return;
   try {
-    await sbRPC('admin_reset_password', { p_user_id: id, p_new_password: newPass });
+    await sbRPC('admin_reset_password', Object.assign({ p_user_id: id, p_new_password: newPass }, actorArgs()));
     alert('Password reset for ' + name + '.');
     logAction('\u{1F511}', 'Password reset', name);
   } catch(e) { alert('Error: ' + e.message); }
@@ -4934,7 +4940,7 @@ async function deleteAdminUser(id) {
     if (!confirm('This is the last DB-managed Super Admin. Your bootstrap login will still always work. Delete anyway?')) return;
   }
   try {
-    await sb('DELETE','admin_users_safe?id=eq.'+id);
+    await sbRPC('admin_delete_user', Object.assign({p_user_id: id}, actorArgs()));
     logAction('\u{1F5D1}\uFE0F','Admin user deleted');
     loadAdminUsers();
   } catch(e) { alert('Error: ' + e.message); }

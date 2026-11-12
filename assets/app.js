@@ -7,7 +7,7 @@ var SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY';
 // ── SUPABASE HELPER ──────────────────────────────────────────────────────────
 async function sb(method,path,body){
   body=body||null;
-  var opts={method:method,headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':method==='POST'?'return=representation':''}};
+  var opts={method:method,headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':method==='POST'?'return=minimal':''}};
   if(body)opts.body=JSON.stringify(body);
   var res=await fetch(SUPABASE_URL+'/rest/v1/'+path,opts);
   if(!res.ok)throw new Error(await res.text());
@@ -1046,6 +1046,8 @@ async function submitRSVP(idx){
   if(!ev||!n.trim()||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)){st.style.color='#e06c6c';st.textContent='Please enter your name and a valid email.';return;}
   st.style.color='var(--gold)';st.textContent='Sending...';
   try{
+    if(ev.capacity){var cr=await fetch(SUPABASE_URL+'/rest/v1/rpc/rsvp_count',{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY},body:JSON.stringify({p_event:ev.name})});
+      if(cr.ok&&(await cr.json())>=ev.capacity){st.style.color='#e06c6c';st.textContent='Sorry, this event is full.';return;}}
     var r=await fetch(SUPABASE_URL+'/rest/v1/event_rsvps',{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,Prefer:'return=minimal'},body:JSON.stringify({event_name:ev.name,name:n.trim(),email:e.trim().toLowerCase(),status:'going'})});
     if(r.status===409){st.style.color='var(--teal)';st.textContent='You are already registered for this event.';return;}
     if(!r.ok)throw new Error();

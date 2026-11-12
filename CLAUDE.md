@@ -25,6 +25,9 @@ Static multi-page portfolio for Uzoukwu Eric Ikenna on Netlify, backed by Supaba
 
 - `netlify/functions/notify.js` (`/api/notify`) emails the owner on CV requests/RSVPs and the requester on approval, via Resend. Env: `RESEND_API_KEY`, `RESEND_FROM` (verified-domain sender), `NOTIFY_TO` (owner inbox). Without them it silently skips. Blog posts deep-link at `/blog/<id>`.
 
-## Known security debt (needs owner decision)
-- `admin.html` has a hardcoded fallback admin username/password in client JS.
-- Most tables use anon `FOR ALL USING (true)` policies, so anyone with the public anon key can read/modify data, including PII (cv_requests, event_rsvps, contact_submissions, newsletter). Proper fix: Supabase Auth for admin + authenticated-only RLS.
+## Admin security model
+- No built-in credentials. Create your super admin with `seed-admin.sql` (edit first), then run `admin-hardening.sql`.
+- `admin-hardening.sql`: privileged admin RPCs (`create_admin_user`, `admin_reset_password`, `admin_update_user`, `admin_delete_user`, `admin_list_users`) verify an active super admin's credentials in Postgres; anon has no access to `admin_users_safe`; login attempts are slowed.
+- PII tables (`cv_requests`, `event_rsvps`, `contact_submissions`, `newsletter_subscribers`): anon can only INSERT. Admin reads/updates go through `netlify/functions/admin-proxy.js` (service key, admin credentials verified first). Public inserts must use `Prefer: return=minimal`.
+- Remaining debt: other content tables (blog, events, certifications, ...) still allow anon writes, so the admin login only protects the UI for those. Full fix = Supabase Auth + authenticated-only RLS.
+- Event RSVP capacity: `events.capacity` (admin event editor), counted via `rsvp_count()`.

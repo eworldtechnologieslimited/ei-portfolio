@@ -88,8 +88,7 @@ This guide will help you deploy your portfolio website to Netlify and connect it
 1. Visit your Netlify site URL
 2. Navigate to `/dashboard` (e.g., `https://your-site.netlify.app/dashboard`)
 3. Log in with the default credentials:
-   - **Username**: `ericadmin`
-   - **Password**: `EWF@2026#Blog`
+   - Create your admin account by running `seed-admin.sql` (edit the username/password first). There is no built-in default login.
 
 **⚠️ IMPORTANT**: Change these credentials in the dashboard after your first login for security.
 
@@ -148,7 +147,7 @@ If you can't log in to the dashboard:
 
 1. Check that Supabase is properly configured
 2. Verify the admin_users table was created
-3. Try the hardcoded credentials: `ericadmin` / `EWF@2026#Blog`
+3. Re-run `seed-admin.sql` to (re)create a super admin account
 
 ## Maintenance
 
