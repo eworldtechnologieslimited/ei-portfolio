@@ -1,0 +1,11 @@
+# Netlify Redirects — uzoukwuericikenna.com
+
+# Admin dashboard (both paths)
+/dashboard        /admin.html         200
+/admin            /admin.html         200
+
+# Maintenance mode — uncomment to activate
+# /*              /maintenance.html   200!
+
+# 404 fallback
+/*                /404.html           404

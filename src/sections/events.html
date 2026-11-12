@@ -1,0 +1,20 @@
+<section class="section" id="events">
+  <div class="s-eyebrow reveal">Events</div>
+  <h2 class="s-title reveal">Where I show up &amp; <em>contribute</em></h2>
+  <div class="s-rule reveal"></div>
+  <div class="events-filters reveal" id="eventsFilters">
+    <button class="events-filter active" data-filter="all" onclick="filterEvents('all',this)">All</button>
+    <button class="events-filter" data-filter="upcoming" onclick="filterEvents('upcoming',this)">Upcoming</button>
+    <button class="events-filter" data-filter="past" onclick="filterEvents('past',this)">Past</button>
+    <button class="events-filter" data-filter="Speaking" onclick="filterEvents('Speaking',this)">Speaking</button>
+    <button class="events-filter" data-filter="Workshop" onclick="filterEvents('Workshop',this)">Workshop</button>
+    <button class="events-filter" data-filter="Attending" onclick="filterEvents('Attending',this)">Attending</button>
+    <button class="events-filter" data-filter="Community" onclick="filterEvents('Community',this)">Community</button>
+  </div>
+  <div class="events-grid" id="eventsGrid">
+    <div class="events-loading" id="eventsLoading">
+      <div class="blog-spinner"></div><span>Loading events...</span>
+    </div>
+  </div>
+  <div class="events-empty" id="eventsEmpty" style="display:none">No events in this category.</div>
+</section>

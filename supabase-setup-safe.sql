@@ -248,14 +248,7 @@ CREATE TABLE IF NOT EXISTS certifications (
   credential_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
-DO $$ BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.columns
-             WHERE table_schema = 'public' AND table_name = 'certifications' AND column_name = 'group_name') THEN
-    ALTER TABLE certifications RENAME COLUMN group_name TO "group";
-  END IF;
-END $$;
-ALTER TABLE certifications ADD COLUMN IF NOT EXISTS display_order INT DEFAULT 0;
-ALTER TABLE testimonials ADD COLUMN IF NOT EXISTS display_order INT DEFAULT 0;
+ALTER TABLE certifications RENAME COLUMN group_name TO "group";
 ALTER TABLE certifications ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Anon all certs" ON certifications;
 CREATE POLICY "Anon all certs" ON certifications FOR ALL USING (true) WITH CHECK (true);

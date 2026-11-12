@@ -1,0 +1,22 @@
+<section class="section" id="blog">
+  <div class="s-eyebrow reveal">Blog</div>
+  <h2 class="s-title reveal">Thoughts, insights &amp; <em>perspectives</em></h2>
+  <div class="s-rule reveal"></div>
+  <div class="blog-filters reveal" id="blogFilters">
+    <button class="blog-filter active" data-cat="all" onclick="filterBlog('all',this)">All</button>
+    <button class="blog-filter" data-cat="Cybersecurity" onclick="filterBlog('Cybersecurity',this)">Cybersecurity</button>
+    <button class="blog-filter" data-cat="Founder & Entrepreneurship" onclick="filterBlog('Founder & Entrepreneurship',this)">Founder &amp; Entrepreneurship</button>
+    <button class="blog-filter" data-cat="Tech in Africa" onclick="filterBlog('Tech in Africa',this)">Tech in Africa</button>
+    <button class="blog-filter" data-cat="Product & QA" onclick="filterBlog('Product & QA',this)">Product &amp; QA</button>
+    <button class="blog-filter" data-cat="Project Management" onclick="filterBlog('Project Management',this)">Project Management</button>
+    <button class="blog-filter" data-cat="Personal & Thought Leadership" onclick="filterBlog('Personal & Thought Leadership',this)">Personal &amp; Thought Leadership</button>
+  </div>
+  <div class="blog-grid" id="blogGrid">
+    <div class="blog-loading" id="blogLoading"><div class="blog-spinner"></div><span>Loading posts...</span></div>
+  <div style="text-align:center;margin:2.5rem 0 0"><button id="loadMoreBtn" class="btn-secondary" onclick="loadMorePosts()" style="display:none">Load more</button></div>
+  </div>
+  <div class="blog-empty" id="blogEmpty" style="display:none">
+    <div style="font-size:2rem;margin-bottom:1rem">&#x270D;</div>
+    <div style="font-family:var(--mono);font-size:0.75rem;color:var(--muted);letter-spacing:0.1em">No posts yet in this category.</div>
+  </div>
+</section>
