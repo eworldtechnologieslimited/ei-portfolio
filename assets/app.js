@@ -584,6 +584,22 @@ async function loadCaseStudiesFromDB(){
     var cases=await sb('GET','case_studies?order=display_order.asc&select=*');
     if(!cases.length)return;
     window._dbCases=cases;
+    var grid=document.querySelector('#casestudies .case-grid');
+    cases.forEach(function(c,i){
+      var key='db_'+(c.id||i);
+      CASE_STUDIES[key]={tag:c.tag,label:c.label,title:c.title,
+        outcomes:Object.keys(c.outcomes||{}).map(function(k){return{val:c.outcomes[k],label:k};}),
+        sections:[].concat(c.challenge?[{h:'Challenge',c:'<p>'+c.challenge+'</p>'}]:[],c.full_details?[{h:'Details',c:c.full_details}]:[]),
+        tools:c.tech_stack||[]};
+      if(grid&&!grid.querySelector('[data-db="'+key+'"]')){
+        var d=document.createElement('div');d.className='case-card';d.setAttribute('data-db',key);d.onclick=function(){openCase(key);};
+        d.innerHTML='<div class="case-card-num">'+String(grid.children.length+1).padStart(2,'0')+'</div><div class="case-tag-s">'+(c.tag||'')+'</div><div class="case-title">'+(c.title||'')+'</div>'
+          +(c.challenge?'<div class="case-challenge-l">Challenge</div><p class="case-body-s">'+c.challenge+'</p>':'')
+          +'<div class="case-results">'+(c.results||[]).map(function(x){return'<div class="case-result">'+x+'</div>';}).join('')+'</div>'
+          +'<div class="pcard-tools">'+(c.tech_stack||[]).map(function(t){return'<span class="tool-pill">'+t+'</span>';}).join('')+'</div>';
+        grid.appendChild(d);
+      }
+    });
   }catch(e){}
 }
 
@@ -1012,13 +1028,28 @@ function openEventModal(idx){
       ?'<div class="em-body">'+(ev.full_description||('<p>'+ev.short_description+'</p>'))+'</div>'
       :'')
     +(tags?'<div class="em-tags">'+tags+'</div>':'')
-    +calBtn;
+    +calBtn
+    +(isPast?'':'<div id="rsvpBox" style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid var(--border2)"><div class="s-eyebrow" style="margin-bottom:.6rem">RSVP</div>'
+      +'<div class="form-row"><div class="form-group"><input class="form-input" id="rsvpName" placeholder="Your name"/></div><div class="form-group"><input class="form-input" id="rsvpEmail" type="email" placeholder="your@email.com"/></div></div>'
+      +'<button class="form-submit" type="button" onclick="submitRSVP('+idx+')">Reserve my spot &#x2192;</button><div id="rsvpStatus" style="margin-top:.6rem;font-size:.8rem"></div></div>');
   modal.style.display='flex';
   modal.classList.add('open');
   
   content.scrollTop=0;
 }
 
+async function submitRSVP(idx){
+  var ev=window._evData&&window._evData[idx];var st=document.getElementById('rsvpStatus');
+  var n=(document.getElementById('rsvpName')||{}).value||'',e=(document.getElementById('rsvpEmail')||{}).value||'';
+  if(!ev||!n.trim()||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)){st.style.color='#e06c6c';st.textContent='Please enter your name and a valid email.';return;}
+  st.style.color='var(--gold)';st.textContent='Sending...';
+  try{
+    var r=await fetch(SUPABASE_URL+'/rest/v1/event_rsvps',{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,Prefer:'return=minimal'},body:JSON.stringify({event_name:ev.name,name:n.trim(),email:e.trim().toLowerCase(),status:'going'})});
+    if(r.status===409){st.style.color='var(--teal)';st.textContent='You are already registered for this event.';return;}
+    if(!r.ok)throw new Error();
+    st.style.color='var(--teal)';st.textContent='\u2713 You are on the list. See you there!';trackEvent('event_rsvp',{event:ev.name});
+  }catch(x){st.style.color='#e06c6c';st.textContent='Could not save your RSVP. Please try again.';}
+}
 function addToCalendBtn(btn){
   addToCalendar(
     btn.getAttribute('data-name'),
@@ -1106,9 +1137,33 @@ async function submitCVRequest(){
       });
     }
     document.getElementById('cvRefNumber').textContent=refNum;
+    try{localStorage.setItem('cv_last',JSON.stringify({ref:refNum,email:email}));}catch(_){}
     document.getElementById('cvRequestForm').style.display='none';
     document.getElementById('cvRequestSuccess').style.display='block';
   }catch(e){
     if(st){st.style.display='block';st.style.color='#e06c6c';st.textContent='Error submitting. Please try again.';}
   }
 }
+
+
+// ── CV STATUS / DOWNLOAD (after admin approval) ──────────────────────────────
+async function checkCVStatus(ref,email){
+  var out=document.getElementById('cvStatusOut');if(!out)return;
+  out.style.color='var(--gold)';out.textContent='Checking...';
+  try{
+    var r=await fetch('/api/cv-access?ref='+encodeURIComponent(ref)+'&email='+encodeURIComponent(email));
+    var d=await r.json();
+    if(!r.ok){out.style.color='#e06c6c';out.textContent=d.error||'Not found. Check your reference and email.';return;}
+    if(d.status==='approved'){out.style.color='var(--teal)';out.innerHTML='Approved \u2014 <a href="'+d.url+'" style="color:var(--teal);text-decoration:underline">download '+(d.label||'CV')+'</a> (link valid 5 minutes).';}
+    else if(d.status==='rejected'||d.status==='declined'){out.style.color='#e06c6c';out.textContent='This request was not approved.';}
+    else{out.style.color='var(--gold)';out.textContent='Still pending review. Please check back soon.';}
+  }catch(e){out.style.color='#e06c6c';out.textContent='Could not check status right now.';}
+}
+function initCVStatus(){
+  var f=document.getElementById('cvStatusForm');if(!f)return;
+  var q=new URLSearchParams(location.search),last={};try{last=JSON.parse(localStorage.getItem('cv_last')||'{}');}catch(_){}
+  f.cvRef.value=q.get('ref')||last.ref||'';f.cvEmail.value=q.get('email')||last.email||'';
+  f.addEventListener('submit',function(e){e.preventDefault();checkCVStatus(f.cvRef.value.trim(),f.cvEmail.value.trim());});
+  if(q.get('ref')&&q.get('email'))checkCVStatus(f.cvRef.value,f.cvEmail.value);
+}
+document.addEventListener('DOMContentLoaded',initCVStatus);

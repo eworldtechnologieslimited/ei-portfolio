@@ -5954,7 +5954,8 @@ function renderCVRequests(){
       +(r.status==='pending'?
         '<button class="btn-gold" onclick="reviewCVReq(\''+r.id+'\',\'approved\')" style="font-size:.58rem;padding:.35rem .75rem">Approve</button>'
         +'<button class="btn-danger" onclick="reviewCVReq(\''+r.id+'\',\'rejected\')" style="font-size:.58rem;padding:.35rem .75rem">Reject</button>'
-        :'<span style="font-family:var(--mono);font-size:.6rem;color:'+statusColor+'">'+r.status.toUpperCase()+'</span>'
+        :'<span style="font-family:var(--mono);font-size:.6rem;color:'+statusColor+'">'+r.status.toUpperCase()+(r.downloaded_at?' \u00b7 DOWNLOADED':'')+'</span>'
+          +(r.status==='approved'?'<a class="btn-gold" style="font-size:.58rem;padding:.35rem .75rem;text-decoration:none;text-align:center" href="mailto:'+encodeURIComponent(r.email).replace('%40','@')+'?subject='+encodeURIComponent('Your CV request '+r.reference+' is approved')+'&body='+encodeURIComponent('Hi '+r.requester_name+',\n\nYour request was approved. Download your CV here (reference and email are pre-filled):\nhttps://uzoukwuericikenna.com/cv?ref='+r.reference+'&email='+r.email+'\n\nBest,\nEric')+'">Email link</a>':'')
       )
       +'</div></div></div>';
   }).join('');

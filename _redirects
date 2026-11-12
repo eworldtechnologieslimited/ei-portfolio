@@ -1,5 +1,7 @@
 # Netlify Redirects — uzoukwuericikenna.com
 
+/api/*            /.netlify/functions/:splat  200
+
 # Admin dashboard (both paths)
 /dashboard        /admin.html         200
 /admin            /admin.html         200
