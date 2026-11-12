@@ -23,6 +23,8 @@ Static multi-page portfolio for Uzoukwu Eric Ikenna on Netlify, backed by Supaba
 - Upload the CV .docx files (names in `CV_TYPES` in `assets/app.js`) to the `cv-files` bucket. Not in this repo.
 - Event modal has an RSVP form (non-past events); DB `case_studies` rows are appended to the case study grid.
 
+- `netlify/functions/notify.js` (`/api/notify`) emails the owner on CV requests/RSVPs and the requester on approval, via Resend. Env: `RESEND_API_KEY`, `RESEND_FROM` (verified-domain sender), `NOTIFY_TO` (owner inbox). Without them it silently skips. Blog posts deep-link at `/blog/<id>`.
+
 ## Known security debt (needs owner decision)
 - `admin.html` has a hardcoded fallback admin username/password in client JS.
 - Most tables use anon `FOR ALL USING (true)` policies, so anyone with the public anon key can read/modify data, including PII (cv_requests, event_rsvps, contact_submissions, newsletter). Proper fix: Supabase Auth for admin + authenticated-only RLS.

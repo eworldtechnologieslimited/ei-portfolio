@@ -5965,6 +5965,7 @@ async function reviewCVReq(id, status){
   try{
     await sb('PATCH','cv_requests?id=eq.'+id,{status:status,reviewed_at:new Date().toISOString()});
     logAction('CV request '+status+': '+id);
+    if(status==='approved'){var rq=(_allCVReqs||[]).find(function(x){return x.id===id;});if(rq){fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'cv_approved',ref:rq.reference})}).then(function(r){return r.json();}).then(function(d){alert(d.sent?'Approved. Email sent to '+rq.email+'.':'Approved. Email not sent ('+(d.reason||'check Resend setup')+') - use the Email link button.');}).catch(function(){alert('Approved. Email not sent - use the Email link button.');});}}
     loadCVRequests();
   }catch(e){alert('Error updating request.');}
 }

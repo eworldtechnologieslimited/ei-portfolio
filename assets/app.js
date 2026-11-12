@@ -110,7 +110,7 @@ async function openPost(id){
     }
   }catch(e){}
 }
-function closePostModal(){var o=document.getElementById('blogModalOverlay');if(o)o.classList.remove('open');document.documentElement.style.overflow='';document.body.style.overflow='';}
+function closePostModal(){var o=document.getElementById('blogModalOverlay');if(o)o.classList.remove('open');try{if(/^\/blog\/.+/.test(location.pathname))history.replaceState(null,'','/blog');}catch(e){}try{if(/^\/blog\/.+/.test(location.pathname))history.replaceState(null,'','/blog');}catch(e){}document.documentElement.style.overflow='';document.body.style.overflow='';}
 
 // ── EVENTS ───────────────────────────────────────────────────────────────────
 var SEED_EVENTS=[
@@ -843,12 +843,14 @@ openPost = async function(id) {
   var content = document.getElementById('blogModalContent');
   if (!content) return;
   var postUrl = window.location.origin + '/blog/' + id;
+  try{if(/^\/blog(\/|$)/.test(location.pathname))history.replaceState(null,'','/blog/'+id);}catch(e){}
+  try{if(/^\/blog(\/|$)/.test(location.pathname))history.replaceState(null,'','/blog/'+id);}catch(e){}
   var title = content.querySelector('.blog-modal-title') || {};
   var titleText = (title.textContent || 'Post').trim();
   var shares = sharePost(titleText, postUrl);
   var shareHtml = '<div class="post-share-bar">'
     + '<span class="post-share-label">Share</span>'
-    + '<button onclick="nativeShare(titleText, postUrl)" class="share-btn share-native">🔗 Share this post</button>'
+    + '<button data-t="'+titleText.replace(/"/g,'&quot;')+'" data-u="'+postUrl+'" onclick="nativeShare(this.dataset.t,this.dataset.u)" class="share-btn share-native">🔗 Share this post</button>'
     + '</div>'
     + '<div id="sharePanel"></div>'
   if (!content.querySelector('.post-share-bar')) {
@@ -1047,7 +1049,7 @@ async function submitRSVP(idx){
     var r=await fetch(SUPABASE_URL+'/rest/v1/event_rsvps',{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,Prefer:'return=minimal'},body:JSON.stringify({event_name:ev.name,name:n.trim(),email:e.trim().toLowerCase(),status:'going'})});
     if(r.status===409){st.style.color='var(--teal)';st.textContent='You are already registered for this event.';return;}
     if(!r.ok)throw new Error();
-    st.style.color='var(--teal)';st.textContent='\u2713 You are on the list. See you there!';trackEvent('event_rsvp',{event:ev.name});
+    st.style.color='var(--teal)';st.textContent='\u2713 You are on the list. See you there!';trackEvent('event_rsvp',{event:ev.name});notifyServer({type:'rsvp',event:ev.name,email:e.trim().toLowerCase()});notifyServer({type:'rsvp',event:ev.name,email:e.trim().toLowerCase()});
   }catch(x){st.style.color='#e06c6c';st.textContent='Could not save your RSVP. Please try again.';}
 }
 function addToCalendBtn(btn){
@@ -1137,6 +1139,8 @@ async function submitCVRequest(){
       });
     }
     document.getElementById('cvRefNumber').textContent=refNum;
+    notifyServer({type:'cv_request',ref:refNum});
+    notifyServer({type:'cv_request',ref:refNum});
     try{localStorage.setItem('cv_last',JSON.stringify({ref:refNum,email:email}));}catch(_){}
     document.getElementById('cvRequestForm').style.display='none';
     document.getElementById('cvRequestSuccess').style.display='block';
@@ -1167,3 +1171,19 @@ function initCVStatus(){
   if(q.get('ref')&&q.get('email'))checkCVStatus(f.cvRef.value,f.cvEmail.value);
 }
 document.addEventListener('DOMContentLoaded',initCVStatus);
+
+// deep link: /blog/<id> or /blog?post=<id>
+document.addEventListener('DOMContentLoaded',function(){
+  var m=location.pathname.match(/^\/blog\/([^\/]+)/),id=m?decodeURIComponent(m[1]):new URLSearchParams(location.search).get('post');
+  if(id&&document.getElementById('blogGrid'))openPost(id);
+});
+// owner/requester notifications (server decides recipients; client only sends ids)
+function notifyServer(body){try{fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),keepalive:true}).catch(function(){});}catch(e){}}
+
+// deep link: /blog/<id> or /blog?post=<id>
+document.addEventListener('DOMContentLoaded',function(){
+  var m=location.pathname.match(/^\/blog\/([^\/]+)/),id=m?decodeURIComponent(m[1]):new URLSearchParams(location.search).get('post');
+  if(id&&document.getElementById('blogGrid'))openPost(id);
+});
+// owner/requester notifications (server decides recipients; client only sends ids)
+function notifyServer(body){try{fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),keepalive:true}).catch(function(){});}catch(e){}}

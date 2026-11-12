@@ -1,5 +1,6 @@
 # Netlify Redirects — uzoukwuericikenna.com
 
+/blog/*           /blog.html          200
 /api/*            /.netlify/functions/:splat  200
 
 # Admin dashboard (both paths)

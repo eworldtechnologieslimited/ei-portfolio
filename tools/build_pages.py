@@ -56,6 +56,9 @@ for slug,(label,title,desc,secs) in PAGES.items():
     h+=pl+'<link rel="stylesheet" href="/assets/styles.css?v=%s"/>\n</head>\n<body>'%cv
     body=pre+'\n<main id="main" data-page="%s">\n'%slug+'\n'.join(rd('src/sections/%s.html'%x) for x in secs)+'\n</main>\n'+post
     body=rewrite(body,slug); body=mark_active(body,slug)
+    if slug!='index': body=re.sub(r'<h2( class="s-title[^>]*>.*?)</h2>',r'<h1\1</h1>',body,count=1,flags=re.S)
+    if slug!='index' and '<h1' not in body: body=re.sub(r'<h2( class="contact-lead[^>]*>.*?)</h2>',r'<h1\1</h1>',body,count=1,flags=re.S)
+    if slug!='index': body=re.sub(r'<h2( class="s-title[^>]*>.*?)</h2>',r'<h1\1</h1>',body,count=1,flags=re.S)
     if slug=='index':
         body=body.replace('<img src="/img/hero-eric.webp"','<img fetchpriority="high" decoding="async" src="/img/hero-eric.webp"',1)
     body=re.sub(r'<img (?![^>]*loading=)(?![^>]*fetchpriority)',r'<img loading="lazy" decoding="async" ',body)

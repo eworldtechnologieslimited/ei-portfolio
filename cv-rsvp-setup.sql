@@ -29,3 +29,8 @@ create policy "admin_anon_all event_rsvps" on event_rsvps for all to anon using 
 
 insert into storage.buckets(id,name,public) values('cv-files','cv-files',false) on conflict (id) do nothing;
 insert into storage.buckets(id,name,public) values('site-media','site-media',true) on conflict (id) do nothing;
+
+-- email-notification bookkeeping (each row is emailed once)
+alter table cv_requests add column if not exists notified_at timestamptz;
+alter table cv_requests add column if not exists approved_emailed_at timestamptz;
+alter table event_rsvps add column if not exists notified_at timestamptz;
